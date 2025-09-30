@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -9,10 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuthStore } from '@/stores/auth';
 
 const Navbar = () => {
   const location = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { isAuthenticated, logout, user } = useAuthStore();
 
   const navItems = [
     { name: 'Accueil', path: '/' },
@@ -21,7 +21,7 @@ const Navbar = () => {
     { name: 'Suivi des demandes', path: '/track-requests', requireAuth: true },
   ];
 
-  const filteredNavItems = navItems.filter(item => !item.requireAuth || isLoggedIn);
+  const filteredNavItems = navItems.filter((item) => !item.requireAuth || isAuthenticated);
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200">
@@ -58,12 +58,14 @@ const Navbar = () => {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
-                    <span className="hidden sm:inline">Mon compte</span>
+                    <span className="hidden sm:inline">
+                      {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Mon compte'}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -71,7 +73,7 @@ const Navbar = () => {
                     <Settings className="mr-2 h-4 w-4" />
                     Paramètres
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsLoggedIn(false)}>
+                  <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Déconnexion
                   </DropdownMenuItem>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,8 @@ export default function Register() {
     acceptTerms: false
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     // Simulate registration
     navigate('/login');
   };
@@ -217,7 +217,9 @@ export default function Register() {
                       <Checkbox
                         id="terms"
                         checked={formData.acceptTerms}
-                        onCheckedChange={(checked) => setFormData({...formData, acceptTerms: checked as boolean})}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, acceptTerms: checked === true })
+                        }
                       />
                       <Label htmlFor="terms" className="text-sm">
                         J'accepte les{' '}

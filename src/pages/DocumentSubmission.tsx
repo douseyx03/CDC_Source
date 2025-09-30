@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ChangeEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,46 @@ import {
   Eye
 } from 'lucide-react';
 
+type ServiceType =
+  | 'consignation-judiciaire'
+  | 'depot-legal'
+  | 'financement-pme'
+  | 'credit-immobilier'
+  | 'placement-obligataire'
+  | 'fonds-investissement';
+
+type RequestType = 'nouveau' | 'renouvellement' | 'modification' | '';
+
+interface PersonalInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface SubmissionFormData {
+  serviceType: ServiceType | '';
+  requestType: RequestType;
+  amount: string;
+  description: string;
+  urgency: boolean;
+  documents: UploadedFile[];
+  personalInfo: PersonalInfo;
+}
+
+interface UploadedFile {
+  id: number;
+  name: string;
+  size: number;
+  type: string;
+  file: File;
+}
+
 export default function DocumentSubmission() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SubmissionFormData>({
     serviceType: '',
     requestType: '',
     amount: '',
@@ -39,7 +75,7 @@ export default function DocumentSubmission() {
     }
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const steps = [
     { id: 1, title: 'Type de service', description: 'Sélectionnez le service souhaité' },
@@ -48,7 +84,7 @@ export default function DocumentSubmission() {
     { id: 4, title: 'Vérification', description: 'Validation finale' }
   ];
 
-  const serviceTypes = [
+  const serviceTypes: Array<{ value: ServiceType; label: string }> = [
     { value: 'consignation-judiciaire', label: 'Consignation judiciaire' },
     { value: 'depot-legal', label: 'Dépôt légal' },
     { value: 'financement-pme', label: 'Financement PME' },
@@ -57,32 +93,36 @@ export default function DocumentSubmission() {
     { value: 'fonds-investissement', label: 'Fonds d\'investissement' }
   ];
 
-  const requiredDocuments = {
+  const requiredDocuments: Record<ServiceType, string[]> = useMemo(() => ({
     'consignation-judiciaire': ['Décision de justice', 'Pièce d\'identité', 'Justificatif de domicile'],
     'depot-legal': ['Acte constitutif', 'Registre de commerce', 'Statuts'],
     'financement-pme': ['Business plan', 'États financiers', 'Garanties'],
     'credit-immobilier': ['Titre foncier', 'Devis détaillé', 'Bulletins de salaire'],
     'placement-obligataire': ['Profil investisseur', 'Justificatifs de revenus'],
     'fonds-investissement': ['Questionnaire investisseur', 'Justificatifs financiers']
-  };
+  }), []);
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) {
+      return;
+    }
+
     const files = Array.from(event.target.files);
-    const newFiles = files.map(file => ({
+    const newFiles = files.map<UploadedFile>((file) => ({
       id: Date.now() + Math.random(),
       name: file.name,
       size: file.size,
       type: file.type,
-      file: file
+      file
     }));
-    setUploadedFiles([...uploadedFiles, ...newFiles]);
+    setUploadedFiles((previous) => [...previous, ...newFiles]);
   };
 
-  const removeFile = (fileId) => {
-    setUploadedFiles(uploadedFiles.filter(file => file.id !== fileId));
+  const removeFile = (fileId: number) => {
+    setUploadedFiles((previous) => previous.filter((file) => file.id !== fileId));
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -153,7 +193,14 @@ export default function DocumentSubmission() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="serviceType">Type de service *</Label>
-                  <Select onValueChange={(value) => setFormData({...formData, serviceType: value})}>
+                  <Select
+                    onValueChange={(value) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        serviceType: value as ServiceType
+                      }))
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionnez un service" />
                     </SelectTrigger>
@@ -189,12 +236,24 @@ export default function DocumentSubmission() {
                       type="number"
                       placeholder="Ex: 1000000"
                       value={formData.amount}
-                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                    onChange={(event) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        amount: event.target.value
+                      }))
+                    }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="requestType">Type de demande</Label>
-                    <Select onValueChange={(value) => setFormData({...formData, requestType: value})}>
+                    <Select
+                      onValueChange={(value) =>
+                        setFormData((previous) => ({
+                          ...previous,
+                          requestType: value as RequestType
+                        }))
+                      }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez" />
                       </SelectTrigger>
@@ -214,7 +273,12 @@ export default function DocumentSubmission() {
                     placeholder="Décrivez votre demande en détail..."
                     rows={4}
                     value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    onChange={(event) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        description: event.target.value
+                      }))
+                    }
                   />
                 </div>
 
@@ -222,7 +286,12 @@ export default function DocumentSubmission() {
                   <Checkbox
                     id="urgency"
                     checked={formData.urgency}
-                    onCheckedChange={(checked) => setFormData({...formData, urgency: checked})}
+                    onCheckedChange={(checked) =>
+                      setFormData((previous) => ({
+                        ...previous,
+                        urgency: checked === true
+                      }))
+                    }
                   />
                   <Label htmlFor="urgency">Demande urgente (traitement prioritaire)</Label>
                 </div>

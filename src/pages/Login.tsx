@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Navbar from '@/components/Navbar';
 import { Eye, EyeOff, Shield, Smartphone } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth';
 
 export default function Login() {
   const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
@@ -19,12 +21,13 @@ export default function Login() {
   });
   const [showOTP, setShowOTP] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!showOTP) {
       setShowOTP(true);
     } else {
-      // Simulate successful login
+      login({ email: loginData.email });
+      setShowOTP(false);
       navigate('/dashboard');
     }
   };
@@ -127,7 +130,14 @@ export default function Login() {
                 </TabsContent>
                 
                 <TabsContent value="phone">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      login({});
+                      navigate('/dashboard');
+                    }}
+                    className="space-y-4"
+                  >
                     <div className="space-y-2">
                       <Label htmlFor="phone">Numéro de téléphone</Label>
                       <Input
