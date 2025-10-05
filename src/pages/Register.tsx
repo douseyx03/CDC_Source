@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +9,35 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Navbar from '@/components/Navbar';
 import { User, Building, Landmark, Eye, EyeOff } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth';
+
+interface RegistrationFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  companyName: string;
+  companyType: string;
+  acceptTerms: boolean;
+}
+
+type AccountType = 'individual' | 'business' | 'institution' | '';
+
+type SubmissionState = 'idle' | 'success';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { register: registerUser, loading, clearError } = useAuthStore((state) => ({
+    register: state.register,
+    loading: state.loading,
+    clearError: state.clearError,
+  }));
+
   const [showPassword, setShowPassword] = useState(false);
-  const [accountType, setAccountType] = useState('');
-  const [formData, setFormData] = useState({
+  const [accountType, setAccountType] = useState<AccountType>('');
+  const [formData, setFormData] = useState<RegistrationFormData>({
     firstName: '',
     lastName: '',
     email: '',
@@ -23,25 +46,106 @@ export default function Register() {
     confirmPassword: '',
     companyName: '',
     companyType: '',
-    acceptTerms: false
+    acceptTerms: false,
   });
+  const [status, setStatus] = useState<SubmissionState>('idle');
+  const [message, setMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    // Simulate registration
-    navigate('/login');
+  const accountTypes = useMemo(
+    () => ([
+      {
+        value: 'individual' as const,
+        label: 'Particulier',
+        icon: User,
+        description: 'Compte personnel pour services de consignation et épargne',
+      },
+      {
+        value: 'business' as const,
+        label: 'Entreprise',
+        icon: Building,
+        description: 'Compte professionnel pour PME et grandes entreprises',
+      },
+      {
+        value: 'institution' as const,
+        label: 'Institution',
+        icon: Landmark,
+        description: 'Compte pour banques, assurances et partenaires financiers',
+      },
+    ]),
+    [],
+  );
+
+  const resetMessages = () => {
+    setStatus('idle');
+    setMessage(null);
+    clearError();
   };
 
-  const accountTypes = [
-    { value: 'individual', label: 'Particulier', icon: User, description: 'Compte personnel pour services de consignation et épargne' },
-    { value: 'business', label: 'Entreprise', icon: Building, description: 'Compte professionnel pour PME et grandes entreprises' },
-    { value: 'institution', label: 'Institution', icon: Landmark, description: 'Compte pour banques, assurances et partenaires financiers' }
-  ];
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    resetMessages();
+
+    if (!accountType) {
+      setMessage('Veuillez sélectionner un type de compte.');
+      return;
+    }
+
+    if (!formData.acceptTerms) {
+      setMessage('Vous devez accepter les conditions d\'utilisation.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setMessage('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    const typeUtilisateurMap: Record<Exclude<AccountType, ''>, 'particulier' | 'entreprise' | 'institution'> = {
+      individual: 'particulier',
+      business: 'entreprise',
+      institution: 'institution',
+    };
+
+    const organisationTypeMap: Record<string, string> = {
+      'pme': 'pme',
+      'grande-entreprise': 'grande_entreprise',
+      'startup': 'startup',
+      'cooperative': 'cooperative',
+      'banque': 'banque',
+      'assurance': 'assurance',
+      'microfinance': 'microfinace',
+      'gouvernement': 'institution_gouvernementale',
+    };
+
+    const payload = {
+      nom: formData.lastName.trim(),
+      prenom: formData.firstName.trim(),
+      email: formData.email.trim(),
+      telephone: formData.phone.trim(),
+      password: formData.password,
+      password_confirmation: formData.confirmPassword,
+      type_utilisateur: typeUtilisateurMap[accountType],
+      nom_entreprise: accountType === 'business' ? formData.companyName.trim() : null,
+      type_entreprise: accountType === 'business' ? organisationTypeMap[formData.companyType] ?? null : null,
+      nom_institution: accountType === 'institution' ? formData.companyName.trim() : null,
+      type_institution: accountType === 'institution' ? organisationTypeMap[formData.companyType] ?? null : null,
+    };
+
+    try {
+      const response = await registerUser(payload);
+      setStatus('success');
+      setMessage(response.message ?? 'Inscription réussie. Vérifiez vos emails pour confirmer votre compte.');
+      // Redirection vers la page de connexion après un court délai
+      setTimeout(() => navigate('/login'), 1500);
+    } catch (registerError) {
+      setMessage((registerError as Error).message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl w-full space-y-8">
           <div className="text-center">
@@ -60,29 +164,37 @@ export default function Register() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {message && (
+                <Alert className="mb-6" variant={status === 'success' ? 'default' : 'destructive'}>
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Account Type Selection */}
                 <div className="space-y-4">
                   <Label className="text-base font-medium">Type de compte</Label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {accountTypes.map((type) => (
-                      <div
+                      <button
                         key={type.value}
-                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                        type="button"
+                        className={`p-4 border rounded-lg transition-all text-left ${
                           accountType === type.value
-                            ? 'border-blue-600 bg-blue-50'
+                            ? 'border-blue-600 bg-blue-50 shadow-sm'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
-                        onClick={() => setAccountType(type.value)}
+                        onClick={() => {
+                          resetMessages();
+                          setAccountType(type.value);
+                        }}
                       >
                         <div className="flex flex-col items-center text-center space-y-2">
-                          <type.icon className={`h-8 w-8 ${
-                            accountType === type.value ? 'text-blue-600' : 'text-gray-400'
-                          }`} />
+                          <type.icon className={`h-8 w-8 ${ accountType === type.value ? 'text-blue-600' : 'text-gray-400' }`} />
                           <h3 className="font-medium">{type.label}</h3>
                           <p className="text-xs text-gray-500">{type.description}</p>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -96,7 +208,7 @@ export default function Register() {
                         <Input
                           id="firstName"
                           value={formData.firstName}
-                          onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                          onChange={(event) => setFormData({ ...formData, firstName: event.target.value })}
                           required
                         />
                       </div>
@@ -105,7 +217,7 @@ export default function Register() {
                         <Input
                           id="lastName"
                           value={formData.lastName}
-                          onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                          onChange={(event) => setFormData({ ...formData, lastName: event.target.value })}
                           required
                         />
                       </div>
@@ -118,7 +230,7 @@ export default function Register() {
                           id="email"
                           type="email"
                           value={formData.email}
-                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                           required
                         />
                       </div>
@@ -127,31 +239,34 @@ export default function Register() {
                         <Input
                           id="phone"
                           type="tel"
-                          placeholder="+221 XX XXX XX XX"
+                          placeholder="+221XXXXXXXXX"
                           value={formData.phone}
-                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                          onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
                           required
                         />
                       </div>
                     </div>
 
-                    {/* Company Information for Business/Institution */}
+                    {/* Company / Institution Information */}
                     {(accountType === 'business' || accountType === 'institution') && (
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="companyName">
-                            {accountType === 'business' ? 'Nom de l\'entreprise' : 'Nom de l\'institution'} *
+                            {accountType === 'business' ? "Nom de l'entreprise" : "Nom de l'institution"} *
                           </Label>
                           <Input
                             id="companyName"
                             value={formData.companyName}
-                            onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+                            onChange={(event) => setFormData({ ...formData, companyName: event.target.value })}
                             required
                           />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="companyType">Type d'organisation *</Label>
-                          <Select onValueChange={(value) => setFormData({...formData, companyType: value})}>
+                          <Select
+                            value={formData.companyType}
+                            onValueChange={(value) => setFormData({ ...formData, companyType: value })}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Sélectionnez le type" />
                             </SelectTrigger>
@@ -186,7 +301,7 @@ export default function Register() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             value={formData.password}
-                            onChange={(e) => setFormData({...formData, password: e.target.value})}
+                            onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                             required
                           />
                           <Button
@@ -194,7 +309,7 @@ export default function Register() {
                             variant="ghost"
                             size="sm"
                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowPassword(!showPassword)}
+                            onClick={() => setShowPassword((previous) => !previous)}
                           >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
@@ -204,60 +319,41 @@ export default function Register() {
                         <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
                         <Input
                           id="confirmPassword"
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           value={formData.confirmPassword}
-                          onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                          onChange={(event) => setFormData({ ...formData, confirmPassword: event.target.value })}
                           required
                         />
                       </div>
                     </div>
 
-                    {/* Terms and Conditions */}
+                    {/* Terms */}
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="terms"
                         checked={formData.acceptTerms}
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, acceptTerms: checked === true })
-                        }
+                        onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: Boolean(checked) })}
                       />
-                      <Label htmlFor="terms" className="text-sm">
-                        J'accepte les{' '}
-                        <Link to="/terms" className="text-blue-600 hover:underline">
-                          conditions d'utilisation
-                        </Link>{' '}
-                        et la{' '}
-                        <Link to="/privacy" className="text-blue-600 hover:underline">
-                          politique de confidentialité
-                        </Link>
+                      <Label htmlFor="terms" className="text-sm text-gray-600">
+                        J'accepte les conditions générales d'utilisation et la politique de confidentialité.
                       </Label>
                     </div>
 
-                    <Alert>
-                      <AlertDescription>
-                        Votre compte sera vérifié sous 24-48h. Vous recevrez un email de confirmation.
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={!formData.acceptTerms}
-                    >
+                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
                       Créer mon compte
                     </Button>
                   </>
                 )}
               </form>
-
-              <div className="mt-6 text-center text-sm text-gray-600">
-                Déjà un compte ?{' '}
-                <Link to="/login" className="text-blue-600 hover:underline font-medium">
-                  Se connecter
-                </Link>
-              </div>
             </CardContent>
           </Card>
+
+          <div className="text-center text-sm text-gray-600">
+            Déjà membre ?{' '}
+            <Link to="/login" className="text-blue-600 hover:underline font-medium">
+              Se connecter
+            </Link>
+          </div>
         </div>
       </div>
     </div>

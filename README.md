@@ -7,11 +7,16 @@ This starter helps you quickly reconstruct an MGX prototype in a local React + T
    ```bash
    npm install
    ```
-2. Start dev server:
+2. Copy `.env.example` to `.env` and configure the API URL (Laravel par défaut sur `http://localhost:8000`):
+   ```bash
+   cp .env.example .env
+   echo "VITE_API_URL=http://localhost:8000/api" >> .env
+   ```
+3. Start dev server:
    ```bash
    npm run dev
    ```
-3. Paste your files quickly using the helper script:
+4. Paste your files quickly using the helper script:
    ```bash
    node scripts/bulk-paste.mjs
    ```

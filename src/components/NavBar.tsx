@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, User, LogOut, Settings } from 'lucide-react';
@@ -12,7 +12,21 @@ import { useAuthStore } from '@/stores/auth';
 
 const Navbar = () => {
   const location = useLocation();
-  const { isAuthenticated, logout, user } = useAuthStore();
+  const navigate = useNavigate();
+  const { isAuthenticated, logout, user } = useAuthStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    logout: state.logout,
+    user: state.user,
+  }));
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const displayName = user
+    ? `${user.prenom ?? ''} ${user.nom ?? ''}`.trim() || user.email
+    : 'Mon compte';
 
   const navItems = [
     { name: 'Accueil', path: '/' },
@@ -63,9 +77,7 @@ const Navbar = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
-                    <span className="hidden sm:inline">
-                      {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Mon compte'}
-                    </span>
+                    <span className="hidden sm:inline">{displayName ?? 'Mon compte'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -73,7 +85,7 @@ const Navbar = () => {
                     <Settings className="mr-2 h-4 w-4" />
                     Paramètres
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={logout}>
+                  <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Déconnexion
                   </DropdownMenuItem>
